@@ -1,6 +1,6 @@
 let socket = io();
 
-var mesajes = document.getElementById("mensajes");
+var mensajes = document.getElementById("mensajes");
 
 function agregarMensaje(mensaje) {
 	var p = document.createElement("p");
@@ -119,9 +119,9 @@ window.onload = () => {
 							socket.emit('imagen',canvas.toDataURL());
 						}, 1000);
 					} )
-					.catch( ( err ) => {
-						console.log( err );
-					} );
+				.catch( ( err ) => {
+					console.log( err );
+				} );
 			} );
 		} )
 		.catch( ( err ) => {
@@ -130,4 +130,51 @@ window.onload = () => {
 	}
 
 	socket.emit("inicio2");
+
+	//caja three
+	var scene,camera,renderer;
+	var WIDTH = window.innerWidth;
+	var HEIGTH = window.innerHeight;
+	var SPEED = 0.01;
+	var caja;
+
+	function init(){
+		scene = new THREE.Scene();
+		initCamera();
+		initRenderer();
+		initCaja();
+
+		document.getElementById("caja3D").appendChild(renderer.domElement);
+	}
+
+	function initCaja(){
+		caja = new THREE.Mesh(new THREE.CubeGeometry(2,2,2), new THREE.MeshNormalMaterial());
+		scene.add(caja);
+	}
+
+	function rotateCaja(){
+		caja.rotation.x -= SPEED * 2;
+		caja.rotation.y -= SPEED;
+		caja.rotation.z -= SPEED * 3;
+	}
+
+	function initCamera(){
+		camera = new THREE.PerspectiveCamera(70, WIDTH/HEIGTH,1,10);
+		camera.position.set(0,3.5,5);
+		camera.lookAt(scene.position);
+	}
+	
+	function initRenderer(){
+		renderer = new THREE.WebGLRenderer({ antialias: true });
+		renderer.setSize(WIDTH,HEIGTH);
+	}	
+
+	function render(){
+		requestAnimationFrame(render);
+		rotateCaja();
+		renderer.render(scene,camera);
+	}
+
+	init();
+	render();
 };
