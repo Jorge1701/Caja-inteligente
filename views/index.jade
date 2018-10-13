@@ -1,0 +1,41 @@
+extends layout
+
+block content
+	div(class='panel')
+		h1 #{title}
+		table
+			tbody
+				tr
+					th Estado del MCU
+					td(id='estadoMCU') ...
+				tr
+					th Monitoreo
+					td(id='monitoreo') ...
+					td
+						button(id='btnMonitoreo')
+				tr
+					th Estado de apertura
+					td(id='apertura') ...
+				tr
+					th Luz interior
+					td(id='luz') ...
+
+	div(class='panel')
+		video(id='camara', autoplay)
+		img(id='imagen')
+		canvas(id='canvas', hidden)
+		button(id='btnArr') Arriba
+		div
+			button(id='btnIzq') Izquierda
+			button(id='btnDer') Derecha
+		button(id='btnAba') Abajo
+
+	div(class='panel')
+		h2 Mensajes
+		div(id='mensajes')
+
+		img(id='foto')
+
+	script(type='text/javascript', src='/javascripts/jquery.js')
+	script(type='text/javascript', src='/socket.io/socket.io.js')
+	script(type='text/javascript', src='/javascripts/index_client.js')

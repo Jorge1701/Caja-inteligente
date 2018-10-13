@@ -1,0 +1,51 @@
+body {
+  padding: 0 15%;
+  font: 14px Helvetica, Arial, sans-serif;
+  text-align: center;
+  background-color: #0aaefbe6;
+}
+
+*{
+   border-radius: 5px;
+}
+
+table{
+  text-align: left;
+  display: inline-block;
+  padding: 20px;
+  background-color: rgba(0,0,0,.1);
+  margin-bottom: 20px;
+}
+
+.panel{
+  margin-top: 5%;
+  background-color: #FFF;
+  padding: 10px;
+  border: 1px solid #000;
+  overflow: auto;
+}
+
+#camara,
+#imagen {
+  width: 500px;
+}
+
+img{
+  width: 100%;
+}
+
+th,td {
+  padding: 5px;
+}
+
+#btnMonitoreo{
+	display: none;
+}
+
+#mensajes {
+  margin-top: 50px;
+}
+
+#mensajes p {
+  text-align: left;
+}

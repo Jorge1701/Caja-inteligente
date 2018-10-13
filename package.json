@@ -1,0 +1,21 @@
+{
+  "name": "caja",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.3",
+    "debug": "^2.6.9",
+    "express": "^4.16.3",
+    "http-errors": "^1.6.3",
+    "imageurl-base64": "^1.0.0",
+    "jade": "^1.11.0",
+    "morgan": "^1.9.1",
+    "node-fetch": "^2.2.0",
+    "nodemailer": "^4.6.8",
+    "serialport": "^7.0.2",
+    "socketio": "^1.0.0"
+  }
+}

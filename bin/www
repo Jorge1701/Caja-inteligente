@@ -1,0 +1,276 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('caja:server');
+var http = require('http');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**<p></p>
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/* ===== Agregado ================================================ */
+
+
+//Si no se importa socket.io el servicio no queda disponible para el cliente.
+let io = require('socket.io')(server);
+
+const fetch = require('node-fetch');
+let SerialPort = require('serialport');
+let Readline = SerialPort.parsers.Readline;
+let puerto = new SerialPort('COM3', { autoOpen: false, baudRate: 9600 });
+let parser = puerto.pipe(new Readline({ delimiter: '\n' }));
+var request = require('request');
+let fs = require( 'fs' );
+
+let conectado = false;
+
+function abrirPuerto() {
+  puerto.open((err) => {
+    io.emit('estadoMCU', 'Desconectado');
+    if (err) {
+      console.log('Error al conectar MCU, intentando reconectar...');
+      conectado = false;
+      setTimeout(() => {
+        abrirPuerto();
+      }, 5000);
+    } else {
+      conectado = true;
+      console.log("MCU Conectado");
+      io.emit('estadoMCU','Conectado');
+    }
+  });
+}
+
+abrirPuerto();
+
+
+let ancho = 640;
+let alto = 480;
+
+io.on('connection', (socket) => {
+  console.log('Cliente conectado');
+
+  puerto.write( '2' );
+  if(conectado){
+    socket.emit('estadoMCU', 'Conectado');
+  }else{
+    socket.emit('estadoMCU', 'Desconectado');
+  }
+
+  socket.on('cambiarMonitoreo', () => {
+    puerto.write( '0' );
+  });
+
+  socket.on("inicio", () => {
+    puerto.write( '2' );
+  });
+
+  socket.on("inicio2", () => {
+    puerto.write( '1' );
+  });
+
+  socket.on( 'mover', ( mover ) => {
+    console.log( "MOVER: " + mover );
+    puerto.write( mover );
+  } );
+
+  socket.on('imagen', (data) => {
+    data = data.replace(/^data:image\/png;base64,/, "");
+    fs.writeFile('./cara.png', data, 'base64', (err) => {
+      if (err) {
+        console.log(err);
+      }
+
+      var formData = {
+        equipo: 'equipo1',
+        asignatura: 'ISC',
+        password: 'equipo1.2018',
+        file: {
+          value: fs.createReadStream('cara.png'),
+          options: {
+            filename: 'cara.jpg',
+          }
+        }
+      }
+
+      var url= "http://190.64.134.67:60000/api/uploadImage";
+      request.post({url:url,formData:formData},function(err,resp,body){
+        if (err) {
+          console.log('Error! ' + err);
+        } else {
+          try {
+            let json = JSON.parse( body );
+
+            io.emit( 'imgProcesada', json.ImagenProcess );
+
+            let caras = JSON.parse( json.RostrosCord );
+
+            if ( caras.length === 0 )
+              return;
+
+            let cx = caras[0].x + caras[0].width / 2;
+            let cy = caras[0].y + caras[0].height / 2;
+
+            let posX = ( ( cx / ancho ) - .5 ) * 2;
+            let posY = ( ( cy / alto ) - .5 ) * 2;
+
+            puerto.write( "x=" + posX + ",y=" + posY );
+          } catch ( e ) {
+            console.log( e );
+          }
+        }
+      });
+      
+    });
+  });
+});
+
+puerto.on('close', () => {
+  console.log('MCU Desconectado');
+  abrirPuerto();
+});
+
+//Recibir datos desde el MCU y enviarlos al todos los clientes conectados.
+parser.on('data', (data) => {
+  //data = data.toString(); // Por las dudas
+  try {
+    let json = JSON.parse(data);
+    console.log('MCU <' + data + ">");
+    
+    //Si se recibe el dato clave.
+    if(json.alarma != undefined){
+      var i2b = require("imageurl-base64");
+      var urlImagen = 'http://tipisc:tipisc@192.168.20.254:65000/jpg/image.jpg';
+      i2b(urlImagen, function(err, data){
+        if(err)
+          console.log(err);
+        else {
+          json.foto = data.base64;
+          enviarCorreo(data.base64);
+          io.emit('data', json);
+        }
+      });
+    }
+
+    io.emit('data', json);
+  } catch (err) {
+    console.log("Error al parsear JSON");
+  }
+
+});
+
+let nodemailer = require('nodemailer');
+
+function enviarCorreo(imagenBase64){
+
+  var transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'hospitalwebuy@gmail.com',
+      pass: 'rooteo1234'
+    }
+  });
+
+  var opciones = {
+    to: 'alejandropeculio@gmail.com',
+    subject: 'Informe de presencia',
+    //text: '',
+    html:'<b>Se detectó una presencia no autorizada</b>, ¿Desea llamar a la policía?',
+    attachments: [{
+     filename: 'foto.jpg',
+     content: imagenBase64,
+     encoding: 'base64'
+   }]
+ };
+
+ transporter.sendMail(opciones, (error, info) => {
+  if (error) {
+    console.log(error);
+  } else {
+    console.log('Correo enviado: ' + info.response);
+  }
+}); 
+
+}
