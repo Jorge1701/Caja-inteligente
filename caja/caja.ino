@@ -1,6 +1,25 @@
 #include <VirtualWire.h>
+#include <Wire.h>
 #include "Caja.h"
 #include "ControlarCamara.h"
+
+const int MPU = 0x68;
+
+const float A_R = 16384.0;
+const float G_R = 131.0;
+
+const float RAW_A_MS2 = 9.8 / 15200;
+
+const float marg = 1;
+ 
+const float RAD_A_DEG = 57.295779;
+
+float antAccX, antAccY, antAccZ;
+float accX, accY;
+float gyrX, gyrY;
+float x, y;
+
+float anterior;
 
 Caja caja( A13, 32, 22, 23, 0, 4 );
 
@@ -20,7 +39,7 @@ const int receptor = A0;
 const int rotarX = 10;
 const int rotarY = 10;
 
-const int pinSalida = 2;
+const int pinSalida = 5;
 const int pinSalida2 = 3;
 
 void setup() {
@@ -28,7 +47,15 @@ void setup() {
   vw_set_rx_pin( receptor );
   vw_rx_start();
   
+  Wire.begin();
+  
+  Wire.beginTransmission( MPU );
+  Wire.write( 0x6B );
+  Wire.write( 0 );
+  Wire.endTransmission( true );
   Serial.begin( 9600 );
+
+  anterior = millis();
   
   caja.iniciar();
 
@@ -52,6 +79,8 @@ void loop() {
   
   if ( caja.estaMonitoreando() ) {
     caja.detectarApertura();
+
+    posicionamiento();
     
     mandarSiguienteFR += tiempo;
     
@@ -142,4 +171,56 @@ bool isClaveCorrecta() {
   }
   
   return correcta;
+}
+
+void posicionamiento() {
+  Wire.beginTransmission( MPU );
+  Wire.write( 0x3B );
+  Wire.endTransmission( false );
+  Wire.requestFrom( MPU, 6, true );
+
+  int16_t ax = Wire.read() << 8 | Wire.read();
+  int16_t ay = Wire.read() << 8 | Wire.read();
+  int16_t az = Wire.read() << 8 | Wire.read();
+
+  accY = atan( -1 * ( ax / A_R ) / sqrt( pow( ( ay / A_R ), 2 ) + pow( ( az / A_R ), 2 ) ) ) * RAD_A_DEG;
+  accX = atan(      ( ay / A_R ) / sqrt( pow( ( ax / A_R ), 2 ) + pow( ( az / A_R ), 2 ) ) ) * RAD_A_DEG;
+
+  float nuevAccX = ax * RAW_A_MS2;
+  float nuevAccY = ay * RAW_A_MS2;
+  float nuevAccZ = az * RAW_A_MS2;
+
+  if ( abs( nuevAccX ) - abs( antAccX ) > marg )
+    json( "ax", nuevAccX - antAccX );
+
+  if ( abs( nuevAccY ) - abs( antAccY ) > marg )
+    json( "ay", nuevAccY - antAccY );
+
+  if ( abs( nuevAccZ ) - abs( antAccZ ) > marg )
+    json( "az", nuevAccZ - antAccZ );
+  
+  antAccX = nuevAccX;
+  antAccY = nuevAccY;
+  antAccZ = nuevAccZ;
+  
+  Wire.beginTransmission( MPU );
+  Wire.write( 0x43 );
+  Wire.endTransmission( false );
+  Wire.requestFrom( MPU, 4, true );
+  
+  int16_t gx = Wire.read() << 8 | Wire.read();
+  int16_t gy = Wire.read() << 8 | Wire.read();
+
+  gyrX = gx / G_R;
+  gyrY = gy / G_R;
+
+  float ahora = millis();
+  float t = ( ahora - anterior ) / 1000;
+  anterior = ahora;
+  
+  x = 0.98 * ( x + gyrX * t ) + 0.02 * accX;
+  y = 0.98 * ( y + gyrY * t ) + 0.02 * accY;
+
+  json( "gx", x );
+  json( "gy", y );
 }

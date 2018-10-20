@@ -1,4 +1,6 @@
 let socket = io();
+var caja;
+var SPEED = 0.01;
 
 var mensajes = document.getElementById("mensajes");
 
@@ -56,6 +58,35 @@ socket.on('data', (json) => {
 		document.getElementById( 'posY' ).innerHTML = json.y;
 	} else if (json.alarma != undefined ) {
 		agregarMensaje("Alarma activada!");
+	} else if ( json.gx != undefined ) {
+		caja.rotation.x = json.gx * Math.PI / 180;
+	} else if ( json.gy != undefined ) {
+		caja.rotation.y = json.gy * Math.PI / 180;
+
+	} else if ( json.ax != undefined ) {
+		if ( ax ) {
+			aceleracion( json.ax, "x" );
+			ax = false;
+			setTimeout( () => {
+				ax = true;
+			}, 5000 );
+		}
+	} else if ( json.ay != undefined ) {
+		if ( ay ) {
+			aceleracion( json.ay, "y" );
+			ay = false;
+			setTimeout( () => {
+				ay = true;
+			}, 5000 );
+		}
+	} else if ( json.az != undefined ) {
+		if ( az ) {
+			aceleracion( json.az, "z" );
+			az = false;
+			setTimeout( () => {
+				az = true;
+			}, 5000 );
+		}
 	}
 });
 
@@ -77,7 +108,19 @@ btnMonitoreo.onclick = () => {
 	socket.emit('cambiarMonitoreo');
 }
 
+let ax = true, ay = true, az = true;
+
+function aceleracion ( acc, eje ) {
+	if ( window.speechSynthesis === undefined )
+		return;
+	
+	let ssu = new SpeechSynthesisUtterance( "Se produjo una aceleración de " + acc + " metros por segundo al cuadrado en el eje " + eje );
+	ssu.lang = "es-UY";
+	window.speechSynthesis.speak( ssu );
+}
+
 window.onload = () => {
+
 	document.getElementById( 'btnIzq' ).onclick = () => {
 		socket.emit( "mover", "x=-1,y=0" );
 	};
@@ -107,7 +150,7 @@ window.onload = () => {
 		navigator.mediaDevices.enumerateDevices().then( (dispositivos) => {
 			console.log( dispositivos );
 			dispositivos.map( ( d ) => {
-				if ( d.deviceId === '01bc7cc30265f1687c4654db8207a33b8547c2b40be469c3a83aada49e864e50' ) // Logitech HD Pro Webcam C920 (046d:082d)
+				if ( d.deviceId === '4d32c60b322a3901ffb6c53565a612cd7e77bdd3a2f38aad1c112f46d95d3851' ) // Logitech HD Pro Webcam C920 (046d:082d)
 					navigator.mediaDevices.getUserMedia( { video: { deviceId: d.deviceId } } ).then( ( stream ) => {
 						video.src = window.URL.createObjectURL( stream );
 						setInterval(() => {
@@ -115,7 +158,6 @@ window.onload = () => {
 							canvas.width = video.videoWidth;
 							var ctx = canvas.getContext('2d');
 							ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-							console.log(canvas.toDataURL());
 							socket.emit('imagen',canvas.toDataURL());
 						}, 1000);
 					} )
@@ -135,8 +177,6 @@ window.onload = () => {
 	var scene,camera,renderer;
 	var WIDTH = window.innerWidth;
 	var HEIGTH = window.innerHeight;
-	var SPEED = 0.01;
-	var caja;
 
 	function init(){
 		scene = new THREE.Scene();
@@ -153,25 +193,27 @@ window.onload = () => {
 	}
 
 	function rotateCaja(){
-		caja.rotation.x -= SPEED * 2;
-		caja.rotation.y -= SPEED;
-		caja.rotation.z -= SPEED * 3;
+		caja.rotation.x = 0;
+		caja.rotation.y = 0;
+		caja.rotation.z = 0;
+
+		console.log( caja.rotation.x );
 	}
 
-	function initCamera(){
-		camera = new THREE.PerspectiveCamera(70, WIDTH/HEIGTH,1,10);
-		camera.position.set(0,3.5,5);
+	function initCamera() {
+		camera = new THREE.PerspectiveCamera( 70, WIDTH / HEIGTH, 1, 1000 );
+		camera.position.set(0,0,5);
 		camera.lookAt(scene.position);
 	}
 	
 	function initRenderer(){
 		renderer = new THREE.WebGLRenderer({ antialias: true });
 		renderer.setSize(WIDTH,HEIGTH);
-	}	
+	}
 
 	function render(){
 		requestAnimationFrame(render);
-		rotateCaja();
+		// rotateCaja();
 		renderer.render(scene,camera);
 	}
 
